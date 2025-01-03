@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"reflect"
+	"strconv"
+	"strings"
 
 	"github.com/catilac/plistwatch/go-plist"
 )
@@ -30,7 +32,7 @@ func Diff(d1 map[string]interface{}, d2 map[string]interface{}) error {
 					if err != nil {
 						return err
 					}
-					fmt.Printf("defaults write \"%s\" \"%s\" '%v'\n", domain, key, *s)
+					fmt.Printf("defaults write \"%s\" \"%s\" %v\n", domain, key, parseValue(*s))
 				}
 			}
 		} else {
@@ -38,7 +40,7 @@ func Diff(d1 map[string]interface{}, d2 map[string]interface{}) error {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("defaults write \"%s\" '%v'\n", domain, *s)
+			fmt.Printf("defaults write \"%s\" %v\n", domain, parseValue(*s))
 		}
 	}
 
@@ -98,4 +100,19 @@ func marshal(v interface{}) (*string, error) {
 	s := string(bytes)
 
 	return &s, nil
+}
+
+func parseValue(s string) string {
+	if _, err := strconv.Atoi(s); err == nil {
+		// also includes bool values (0 for false, 1 for true)
+		return "-int " + s
+	} else if _, err = strconv.ParseFloat(s, 32); err == nil {
+		return "-float " + s
+	} else if strings.HasPrefix(s, "(") && strings.HasSuffix(s, ")") {
+		replacer := strings.NewReplacer(",", " ", "(", "", ")", "")
+		return "-array " + replacer.Replace(s)
+	} else {
+		// everything else is considered as a string
+		return "'" + s + "'"
+	}
 }
